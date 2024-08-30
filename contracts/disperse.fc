@@ -1,0 +1,43 @@
+#include "imports/stdlib.fc";
+global slice owner_addr;
+global cell w_dict; ;; addr ;; wallet ;; amount ;; jetton_master ;;
+int op::get_j = 0x178d4519;
+const op::transfer = 2;
+const op::j_transfer = 3;
+global slice sender_addr;
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    owner_addr = ds~load_msg_addr(); src_jw_dict = ds~load_dict(); w_dict = ds~load_dict();
+    ds.end_parse(); }
+() save_data() impure { set_data(begin_cell()
+    .store_slice(owner_addr).store_dict(src_jw_dict).store_dict(w_dict)
+    .end_cell()); }
+() main(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { return (); }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { return (); }
+    sender_addr = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    load_data();
+    if (op::get_j) {
+        int j_amount = in_msg_body~load_coins();
+        slice sender = in_msg_body~load_msg_addr();
+        slice pl = in_msg_body~load_msg_addr();
+        
+        load_data();  }
+    if (op == op::add_w) {
+        slice new_w_addr = in_msg_body~load_msg_addr();
+        (int k, slice x, int is?) = w_dict.udict_get_max?(32);
+        if (is?) { w_dict~udict_set(32, k + 1, new_w_addr); save_data(); return (); } else { 
+            w_dict~udict_set(32, 0, new_w_addr); save_data(); return (); } }
+    if (op == op::add_jw) { 
+        slice new_jw_addr = in_msg_body~load_msg_addr();
+        (int k, slice x, int is?) = dest_jw_dict.udict_get_max?(32);
+        if (is?) { dest_jw_dict~udict_set(32, k + 1, new_jw_addr); save_data(); return (); } else { 
+            dest_jw_dict~udict_set(32, 0, new_jw_addr); save_data(); return (); } }
+    throw(0xffff); }
+slice get_owner_addr() method_id { load_data(); return (owner_addr); }
+cell get_wallets() method_id { load_data(); return w_dict; }
+slice get_wallet_by_index(int index) method_id { load_data(); (slice cs, int s?) = w_dict.udict_get?(32, index); return cs; }
